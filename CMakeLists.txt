@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.0)
+project(PROVM LANGUAGES C DESCRIPTION "virtual machine for procedural language")
+add_library(provml STATIC provm.c)
+add_executable(provm main.c)
+target_link_libraries(provm PUBLIC provml)
