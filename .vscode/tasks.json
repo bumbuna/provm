@@ -11,8 +11,12 @@
         {
             "label": "build",
             "command": "cmake",
-            "args": ["--build", "${workspaceFolder}/build"],
-            "type": "shell"
+            "args": [
+                "--build",
+                "${workspaceFolder}/build"
+            ],
+            "type": "shell",
+            "problemMatcher": []
         }
     ]
 }

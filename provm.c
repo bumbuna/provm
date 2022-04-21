@@ -10,16 +10,18 @@ enum flagbit {
     zero,
 };
 
-#define flagset(i) (flags |= (1<<i))
-#define flagunset(i) (flags &= ~((unsigned)1<<i)) 
-#define flagtest(i) (flags & (1<<i))
+#define flagset(i) (flags |= (((unsigned long)1)<<i))
+#define flagunset(i) (flags &= ~(((unsigned long)1)<<i)) 
+#define flagtest(i) (flags & (((unsigned long)1)<<i))
 #define flagsclear() (flags = 0)
 
 reg sp;//stack segment
 reg ip;//instruction
-reg fp;//frame
+regf fp;//frame
 reg pc;//program counter
 reg cs;//code segment
+regfl flags;
+
 static reg mem; //main memory
 /*
     
@@ -27,7 +29,7 @@ static reg mem; //main memory
     0 (halt) -> when set causes program exit
     1 (zero) -> set if result of previous instruction was zero 
 */
-static int flags;
+// static int flags;
 
 static int instructionsize(enum opcode o) {
     int r = 1; //sizeof bytecode
@@ -138,7 +140,7 @@ void runvm() {
                     pc = n;
                     flagunset(zero);
                 } else if(o==opcall) {
-                    RETURNADDRESS = pc;
+                    fp->returnaddress = pc;
                     pc = n;
                 }
                 break;
@@ -167,11 +169,11 @@ void runvm() {
                 int *spi = sp;
                 spi--;
                 int *vp = fp;
-                vp -= LOCALSCOUNT;
-                int i = LOCALSCOUNT-ipi[0];
+                vp -= fp->localscount;
+                int i = fp->localscount-ipi[0];
                 if(o==opgetparam) {
-                    vp -= PARAMSCOUNT;
-                    i = PARAMSCOUNT-ipi[0]-1;
+                    vp -= fp->paramscount;
+                    i = fp->paramscount-ipi[0]-1;
                 }
                 spi[0] = vp[i];
                 break;
@@ -180,9 +182,9 @@ void runvm() {
                 ip++;
                 int *spi = sp;
                 int *ipi = ip;
-                int *vi = ((fh_t*)fp);
-                vi -= LOCALSCOUNT;
-                int i = LOCALSCOUNT-ipi[0]-1;
+                int *vi = fp;
+                vi -= fp->localscount;
+                int i = fp->localscount-ipi[0]-1;
                 vi[i] = spi[0];
                 spi++;
                 break;
@@ -204,8 +206,7 @@ void runvm() {
                 int *ipi = ip;
                 int *t = sp;
                 t += (ipi[0]+ipi[1]);
-                fh_t *f = t;
-                fp = f;
+                fp = t;
                 break;
             }
             case ophalt: {
