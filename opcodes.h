@@ -60,7 +60,7 @@ enum opcode {
     /*PARAMETER: C
       push constant C to the stack
      */
-    oploadc,
+    oppushc,
     /*PARAMETER: L P
       allocate space for a new stackframe big enough to hold frame header and L variables
      */
@@ -82,7 +82,23 @@ enum opcode {
     /*PARAMETER:  I
       set value of TOS[I]
      */
-    opvecset
+    opvecset,
+    /*PARAMETER I
+      create instance for class at index I of class table
+    */
+    opclnew,
+    /*
+     initialize instance at top of stack
+     */
+    opclii,
+    /*PARAMETER: I
+      from instance on top of stack get variable  named as string starting at offset I in literal segment
+      */
+    opcligv,
+    /*load content of address on TOS*/
+    oploada,
+    /*set content of address TOS to TOS value*/
+    opseta,
 };
 
 

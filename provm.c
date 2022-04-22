@@ -14,6 +14,14 @@ enum flagbit {
 #define flagunset(i) (flags &= ~(((unsigned long)1)<<i)) 
 #define flagtest(i) (flags & (((unsigned long)1)<<i))
 #define flagsclear() (flags = 0)
+#define stackpush(t,v) sp -= sizeof(t), *(t*)sp = v
+#define stackpop(t) *(t*)((sp += sizeof(t))-sizeof(t))
+#define stackpopn(t,i) sp += (sizeof(t)*i)
+#define stackpeek(t) *(t*)sp
+#define stackpeekn(t,n) *(((t*)sp)+n)
+#define stackcast(t) ((t)sp)
+#define stackalloc(t) (sp -= sizeof(t))
+#define stackallocsz(sz) (sp -= sz)
 
 reg sp;//stack segment
 reg ip;//instruction
@@ -21,6 +29,7 @@ regf fp;//frame
 reg pc;//program counter
 reg cs;//code segment
 regfl flags;
+regcl cls;
 
 static reg mem; //main memory
 /*
@@ -34,10 +43,11 @@ static reg mem; //main memory
 static int instructionsize(enum opcode o) {
     int r = 1; //sizeof bytecode
     switch(o) {
-        case oploadc:
+        case oppushc:
         case opgetlocal:
         case opgetparam:
         case opvecmk:
+        case opclnew:
         case opsetlocal: r += sizeof(int); break;
         case opjmp:
         case opjmpe:
@@ -55,7 +65,8 @@ int startvm(reg codesegment, ...) {
         perror("malloc");
         exit(errno);
     }
-    fp = sp = &mem[STACKLIMIT];
+    sp = &mem[STACKLIMIT];
+    fp = (fh_t*) sp;
     cs = pc = codesegment;
     flagsclear();
     return 0;
@@ -107,34 +118,29 @@ void runvm() {
                 | result        |<------------- SP
             */
             case opadd: case opsub: case opdiv: case opmul: case opmod: case opand: case opor: case opxor:  {
-                int *spi = sp;
-                spi[1] = binaryop(o, spi[1], spi[0]);
-                sp = &spi[1];
-                if(!spi[1]) flagset(zero);
+                int i = binaryop(o, stackpeekn(int,1), stackpeek(int));
+                stackpopn(int,2);
+                stackpush(int, i);
+                if(!i) flagset(zero);
                 break;
             }
             case oplt: case opgt: case oplte: case opgte: case opeq: case opneq: {
-                int *spi = sp;
-                if(!binaryop(o, spi[1], spi[0])) flagset(zero);
-                sp = &spi[2];
+                if(!binaryop(o, stackpeekn(int,1), stackpeekn(int, 0))) flagset(zero);
+                stackpopn(int,2);
                 break;
             }
-            case oploadc: {
+            case oppushc: {
                 ip++;
-                int *spi = sp;
-                spi--;
-                spi[0] = *(int*)ip;
-                sp = spi;
+                stackpush(int, *(int*)ip);
                 break;
             }
             case opjmp: case opjmpe: case opcall: case opjmpz: {
                 ip++;
-                long n = cs+*(reg)ip;
-                int *spi = sp;
+                reg n = (cs+*(long*)ip);
                 if(o==opjmp) {
                     pc = n;
                 } else if (o==opjmpe&&!flagtest(zero)) {
-                    pc = n;
+                    pc = (reg) n;
                     flagunset(zero);
                 } else if(o==opjmpz&&flagtest(zero)) {
                     pc = n;
@@ -146,67 +152,58 @@ void runvm() {
                 break;
             }
             case opneg: case opcompl: {
-                int *spi = sp;
-                spi[0] = unaryop(o, spi[0]);
+                int i = stackpop(int);
+                stackpush(int, unaryop(o, i));
                 break;
             }
             case opret: {
-                int *spi = sp;
-                fh_t *tfp = fp;
-                pc = tfp->returnaddress;
-                fp = tfp->parentframe;
-                int r = spi[0];
-                sp = ++tfp;
-                spi = sp;
-                --spi;
-                spi[0] = r;
-                sp = spi;
+                reg tmp = (reg) fp;
+                pc = fp->returnaddress;
+                fp = fp->parentframe;
+                int r = stackpop(int);
+                sp = tmp;
+                stackpop(fh_t);
+                stackpush(int, r);
                 break;
             }
             case opgetlocal: case opgetparam: {
                 ip++;
-                int *ipi = ip;
-                int *spi = sp;
-                spi--;
-                int *vp = fp;
+                int *ipi = (int*) ip;
+                int *vp = (int*) fp;
                 vp -= fp->localscount;
                 int i = fp->localscount-ipi[0];
                 if(o==opgetparam) {
                     vp -= fp->paramscount;
                     i = fp->paramscount-ipi[0]-1;
                 }
-                spi[0] = vp[i];
+                stackpush(int, vp[i]);
                 break;
             }
             case opsetlocal: {
                 ip++;
-                int *spi = sp;
-                int *ipi = ip;
-                int *vi = fp;
+                int *ipi = (int*) ip;
+                int *vi = (int*) fp;
                 vi -= fp->localscount;
                 int i = fp->localscount-ipi[0]-1;
-                vi[i] = spi[0];
-                spi++;
+                vi[i] = stackpop(int);
                 break;
             }
             case opalloc: { //alloc #L #P
                 ip++;
-                fh_t *spf = sp;
-                int *ipi = ip;
-                --spf;
-                spf->localscount = ipi[0];
-                spf->paramscount = ipi[1];
-                spf->parentframe = fp;
-                sp = spf;
-                sp -= sizeof(int)*ipi[0];
+                int *ipi = (int*) ip;
+                stackalloc(sizeof(fh_t));
+                stackcast(fh_t*)->localscount = ipi[0];
+                stackcast(fh_t*)->paramscount = ipi[1];
+                stackcast(fh_t*)->parentframe = fp;
+                stackallocsz(sizeof(int)*ip[0]);
                 break;
             }
             case opframe: { //frame #l #p
                 ip++;
-                int *ipi = ip;
-                int *t = sp;
-                t += (ipi[0]+ipi[1]);
-                fp = t;
+                int *ipi = (int*) ip;
+                int *t = stackcast(int*);
+                t += (ipi[0], ipi[1]);
+                fp = (fh_t*) t;
                 break;
             }
             case ophalt: {
@@ -214,59 +211,65 @@ void runvm() {
                 break;
             }
             case opwrite: {
-                int *spi = sp;
-                printf("%d\n", spi[0]);
-                sp = ++spi;
+                printf("%d\n", stackpop(int));
                 break;
             }
             case opdup: {
-                int *spi = sp;
-                --spi;
-                spi[0] = spi[1];
-                sp = spi;
+                stackpush(int, stackpeekn(int, 1));
                 break;
             }
             case opvecmk: {
                 ip++;
-                int *ipi = ip;
-                vec_t *vt = sp;
-                vt--;
-                vt->start = calloc(ipi[0], sizeof(int));
-                vt->c = ipi[0];
-                sp = vt;
+                int *ipi = (int*) ip;
+                stackalloc(vec_t);
+                stackcast(vec_t*)->start = calloc(ipi[0], sizeof(int));
+                stackcast(vec_t*)->c = ipi[0];
                 break;
             }
             case opvecget: {
-                int *spi = sp;
-                int i = spi[0];
-                spi++;
-                vec_t *vt = spi;
-                if(vt->c <= i) {
-                    printf("out of bounds: Accessing index %d of array %p of size %d\n", i, vt->start, vt->c);
+                int i = stackpeek(int);
+                stackpop(int);
+                if(stackcast(vec_t*)->c <= i) {
+                    printf("out of bounds: Accessing index %d of array %p of size %d\n", i,
+                                            stackcast(vec_t*)->start, stackcast(vec_t*)->c);
                     flagset(halt);
                     break;
                 }
-                --spi;
-                spi[0] = vt->start[i];
-                sp = spi;
+                stackpush(int, stackcast(vec_t*)->start[i]);
                 break;
             }
             case opvecset: {
-                int *spi = sp;
-                int v = spi[0];
-                int i = spi[1];
-                spi++;
-                spi++;
-                vec_t *vt = spi;
+                int v = stackpeek(int);
+                int i = stackpeekn(int, 1);
+                stackpopn(int,2);
+                vec_t *vt = stackcast(vec_t*);
                 if(vt->c<= i) {
                     printf("out of bounds: Accessing index %d of array %p of size %d\n", i, vt->start, vt->c);
                     flagset(halt);
                     break;
                 }
                 vt->start[i] = v;
-                sp = spi;
                 break;
             }
+            // case opclnew: {
+            //     ip++;
+            //     int i = *(int*)(ip);
+            //     instance_t *t = malloc(1*sizeof(instance_t));
+            //     t->c = i;
+            //     t->address = malloc(sizeof(int)*cls[i].varsc);
+            //     stackpush(void*, t);
+            //     break;
+            // }
+            // case opcligv: {
+            //     ip++;
+            //     int i = *(int*)ip;
+            //     instance_t *t = *(instance_t**)sp;
+            //     sp += sizeof(instance_t *);
+            //     i = t->address[i];
+            //     stackpush(int, i);
+            //     break;
+            // }
+
         }
         if(sp < mem) {
             printf("stackoverflow error.\n");

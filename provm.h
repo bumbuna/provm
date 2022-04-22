@@ -26,8 +26,8 @@ NOTE:
 typedef struct frameheader {
     int paramscount;
     int localscount;
-    long *parentframe;
-    long *returnaddress;
+    struct frameheader *parentframe;
+    char *returnaddress;
 } frameheader_t, fh_t;
 
 typedef struct vector {
@@ -52,13 +52,14 @@ typedef struct class{
 } class_t;
 
 typedef struct instance {
-    class_t *c; //class 
-    void *address;
+    int c; //class index 
+    int *address;
 } instance_t;
 
 typedef char *reg, *regc;
 typedef fh_t* regf;
 typedef unsigned long regfl;
+typedef class_t *regcl;
 //registers
 extern reg sp;//stack segment
 extern reg ip;//instruction
@@ -66,6 +67,7 @@ extern regf fp;//frame
 extern reg pc;//program counter
 extern reg cs;//code segment
 extern regfl flags; //flags
+extern regcl cls; //classes table
 
 extern int startvm(reg , ...);
 extern void runvm();
