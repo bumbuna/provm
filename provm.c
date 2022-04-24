@@ -235,8 +235,7 @@ void runvm() {
                 break;
             }
             case opvecget: {
-                int i = stackpeek(int);
-                stackpop(int);
+                int i = stackpop(int);
                 if(stackcast(vec_t*)->c <= i) {
                     printf("out of bounds: Accessing index %d of array %p of size %d\n", i,
                                             stackcast(vec_t*)->start, stackcast(vec_t*)->c);
