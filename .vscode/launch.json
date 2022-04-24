@@ -11,7 +11,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/provm",
-            "args": ["${workspaceFolder}/scripts/jmpz"],
+            "args": ["${workspaceFolder}/scripts/class_1"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],

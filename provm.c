@@ -30,6 +30,7 @@ reg pc;//program counter
 reg cs;//code segment
 regfl flags;
 regcl cls;
+offset_t codeoffset = sizeof(int);
 
 static reg mem; //main memory
 /*
@@ -48,6 +49,8 @@ static int instructionsize(enum opcode o) {
         case opgetparam:
         case opvecmk:
         case opclnew:
+        case opcligv:
+        case opclisv:
         case opsetlocal: r += sizeof(int); break;
         case opjmp:
         case opjmpe:
@@ -60,7 +63,7 @@ static int instructionsize(enum opcode o) {
     return r;
 }
 
-int startvm(reg codesegment, ...) {
+int startvm(reg codesegment, regcl classinfo,...) {
     if(!mem && !(mem = malloc(STACKLIMIT))) {
         perror("malloc");
         exit(errno);
@@ -68,6 +71,7 @@ int startvm(reg codesegment, ...) {
     sp = &mem[STACKLIMIT];
     fp = (fh_t*) sp;
     cs = pc = codesegment;
+    cls = classinfo;
     flagsclear();
     return 0;
 }
@@ -136,7 +140,7 @@ void runvm() {
             }
             case opjmp: case opjmpe: case opcall: case opjmpz: {
                 ip++;
-                reg n = (cs+*(long*)ip);
+                reg n = (cs+*(long*)ip)-codeoffset;
                 if(o==opjmp) {
                     pc = n;
                 } else if (o==opjmpe&&!flagtest(zero)) {
@@ -218,6 +222,10 @@ void runvm() {
                 stackpush(int, stackpeekn(int, 1));
                 break;
             }
+            case opdupl: {
+                stackpush(long, stackpeekn(long, 1));
+                break;
+            }
             case opvecmk: {
                 ip++;
                 int *ipi = (int*) ip;
@@ -251,25 +259,39 @@ void runvm() {
                 vt->start[i] = v;
                 break;
             }
-            // case opclnew: {
-            //     ip++;
-            //     int i = *(int*)(ip);
-            //     instance_t *t = malloc(1*sizeof(instance_t));
-            //     t->c = i;
-            //     t->address = malloc(sizeof(int)*cls[i].varsc);
-            //     stackpush(void*, t);
-            //     break;
-            // }
-            // case opcligv: {
-            //     ip++;
-            //     int i = *(int*)ip;
-            //     instance_t *t = *(instance_t**)sp;
-            //     sp += sizeof(instance_t *);
-            //     i = t->address[i];
-            //     stackpush(int, i);
-            //     break;
-            // }
-
+            case opclnew: {
+                ip++;
+                int i = *(int*)(ip);
+                instance_t *t = malloc(1*sizeof(instance_t));
+                t->c = i;
+                t->address = malloc(sizeof(int)*cls[i].varsc);
+                stackpush(void*, t);
+                break;
+            }
+            case opcligv: {
+                ip++;
+                instance_t *t = stackpop(instance_t*);
+                stackpush(int, t->address[*(int*)ip]);
+                break;
+            }
+            case opclisv: {
+                ip++;
+                int i = *(int*)ip;
+                int v = stackpop(int);
+                instance_t *t = stackpop(instance_t*);
+                t->address[i] = v;
+                break;
+            }
+            case opcliprint: {
+                instance_t *t = stackpop(instance_t*);
+                fputs("{\n", stdout);
+                for(int i = 0; i < cls[t->c].varsc; i++) {
+                    printf("  %s: %d%c\n", cls[t->c].vars[i], t->address[i], (i+1)==cls[t->c].varsc ? 0: ',');
+                }
+                fputs("}\n", stdout);
+                fflush(stdout);
+                break;
+            }
         }
         if(sp < mem) {
             printf("stackoverflow error.\n");

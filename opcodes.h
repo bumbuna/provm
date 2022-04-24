@@ -99,6 +99,12 @@ enum opcode {
     oploada,
     /*set content of address TOS to TOS value*/
     opseta,
+    opclisv,
+    opclialloc,
+    opcliframe,
+    opclicall,
+    opcliprint,
+    opdupl,
 };
 
 

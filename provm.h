@@ -47,8 +47,8 @@ typedef struct classproc {
 typedef struct class{
     int varsc, procsc;
     char name[IDLIMIT];
-    variable_t vars[IDLIMIT];
-    classproc_t procs[IDLIMIT]; 
+    variable_t vars[FIELDLIMIT];
+    // classproc_t procs[IDLIMIT]; 
 } class_t;
 
 typedef struct instance {
@@ -60,6 +60,7 @@ typedef char *reg, *regc;
 typedef fh_t* regf;
 typedef unsigned long regfl;
 typedef class_t *regcl;
+typedef int offset_t;
 //registers
 extern reg sp;//stack segment
 extern reg ip;//instruction
@@ -68,7 +69,9 @@ extern reg pc;//program counter
 extern reg cs;//code segment
 extern regfl flags; //flags
 extern regcl cls; //classes table
+extern offset_t codeoffset; //offset of code section in obj file
 
-extern int startvm(reg , ...);
+
+extern int startvm(reg , regcl, ...);
 extern void runvm();
 #endif
