@@ -242,7 +242,8 @@ void runvm() {
                     flagset(halt);
                     break;
                 }
-                stackpush(int, stackcast(vec_t*)->start[i]);
+                int v = stackcast(vec_t*)->start[i];
+                stackpush(int, v);
                 break;
             }
             case opvecset: {
