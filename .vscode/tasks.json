@@ -17,6 +17,13 @@
             ],
             "type": "shell",
             "problemMatcher": []
+        },
+        {
+            "label": "provm",
+            "command": "cd ${workspaceFolder}/objectfile && ${workspaceFolder}/build/provm",
+            "args": ["*"],
+            "type": "shell",
+            "promptOnClose": true
         }
     ]
 }

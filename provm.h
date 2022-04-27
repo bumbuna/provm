@@ -32,7 +32,7 @@ typedef struct frameheader {
 
 typedef struct vector {
     int c;
-    int *start;
+    long i0; //index 0
 } vector_t, vec_t;
 
 typedef char variable_t[IDLIMIT];
@@ -53,16 +53,17 @@ typedef struct class{
 
 typedef struct instance {
     int c; //class index 
-    int *address;
+    long f0; //field 0
 } instance_t;
 
 typedef char *reg, *regc;
 typedef fh_t* regf;
 typedef unsigned long regfl;
+typedef long *regl;
 typedef class_t *regcl;
 typedef int offset_t;
 //registers
-extern reg sp;//stack segment
+extern regl sp;//stack segment
 extern reg ip;//instruction
 extern regf fp;//frame
 extern reg pc;//program counter
